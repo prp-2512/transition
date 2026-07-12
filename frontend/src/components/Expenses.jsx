@@ -1,10 +1,11 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../App';
-import { Plus, DollarSign, Fuel } from 'lucide-react';
+import { Plus, DollarSign, Fuel, Search } from 'lucide-react';
 
 export default function Expenses() {
   const { user, token, expenses, fuelLogs, vehicles, loadData, triggerAlert } = useContext(AppContext);
   const [activeTab, setActiveTab] = useState('fuel');
+  const [search, setSearch] = useState('');
   
   // Modals
   const [fuelModalOpen, setFuelModalOpen] = useState(false);
@@ -94,23 +95,37 @@ export default function Expenses() {
 
   return (
     <div>
-      {/* Tabs / Actions row */}
+      {/* Search Input Bar & Tabs */}
       <div className="flex-between" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '16px' }}>
-        <div style={{ display: 'flex', gap: '12px' }}>
-          <button 
-            className={`btn ${activeTab === 'fuel' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('fuel')}
-          >
-            <Fuel size={14} />
-            <span>Fuel Logs</span>
-          </button>
-          <button 
-            className={`btn ${activeTab === 'misc' ? 'btn-primary' : 'btn-secondary'}`}
-            onClick={() => setActiveTab('misc')}
-          >
-            <DollarSign size={14} />
-            <span>Misc Expenses</span>
-          </button>
+        <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div style={{ display: 'flex', gap: '12px' }}>
+            <button 
+              className={`btn ${activeTab === 'fuel' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('fuel')}
+            >
+              <Fuel size={14} />
+              <span>Fuel Logs</span>
+            </button>
+            <button 
+              className={`btn ${activeTab === 'misc' ? 'btn-primary' : 'btn-secondary'}`}
+              onClick={() => setActiveTab('misc')}
+            >
+              <DollarSign size={14} />
+              <span>Misc Expenses</span>
+            </button>
+          </div>
+          
+          <div style={{ position: 'relative', width: '280px' }}>
+            <Search size={16} style={{ position: 'absolute', left: '12px', top: '10px', color: 'var(--text-secondary)' }} />
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ paddingLeft: '36px', paddingTop: '6px', paddingBottom: '6px', fontSize: '13px' }}
+              placeholder={activeTab === 'fuel' ? "Search fuel logs by vehicle..." : "Search expenses by vehicle, category or detail..."}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
         </div>
 
         <div style={{ display: 'flex', gap: '12px' }}>
@@ -143,7 +158,10 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody>
-              {fuelLogs.map(log => (
+              {fuelLogs.filter(log => 
+                log.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) || 
+                log.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase())
+              ).map(log => (
                 <tr key={log._id}>
                   <td>{new Date(log.date).toLocaleDateString()}</td>
                   <td>
@@ -160,10 +178,13 @@ export default function Expenses() {
                 </tr>
               ))}
 
-              {fuelLogs.length === 0 && (
+              {fuelLogs.filter(log => 
+                log.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) || 
+                log.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase())
+              ).length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-                    No fuel purchase logs recorded.
+                    No matching fuel purchase logs found.
                   </td>
                 </tr>
               )}
@@ -186,7 +207,12 @@ export default function Expenses() {
               </tr>
             </thead>
             <tbody>
-              {expenses.map(exp => (
+              {expenses.filter(exp => 
+                exp.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) || 
+                exp.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase()) || 
+                exp.type.toLowerCase().includes(search.toLowerCase()) || 
+                exp.description.toLowerCase().includes(search.toLowerCase())
+              ).map(exp => (
                 <tr key={exp._id}>
                   <td>{new Date(exp.date).toLocaleDateString()}</td>
                   <td>
@@ -207,10 +233,15 @@ export default function Expenses() {
                 </tr>
               ))}
 
-              {expenses.length === 0 && (
+              {expenses.filter(exp => 
+                exp.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) || 
+                exp.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase()) || 
+                exp.type.toLowerCase().includes(search.toLowerCase()) || 
+                exp.description.toLowerCase().includes(search.toLowerCase())
+              ).length === 0 && (
                 <tr>
                   <td colSpan={5} style={{ textAlign: 'center', padding: '30px', color: 'var(--text-secondary)' }}>
-                    No operational expenses recorded.
+                    No matching operational expenses found.
                   </td>
                 </tr>
               )}

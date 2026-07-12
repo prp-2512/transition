@@ -7,7 +7,9 @@ import {
   Map, 
   Users, 
   Activity, 
-  TrendingUp 
+  TrendingUp,
+  Shield,
+  Fuel
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -23,14 +25,25 @@ import {
 } from 'recharts';
 
 export default function Dashboard() {
-  const { kpis, vehicles, trips, expenses, fuelLogs } = useContext(AppContext);
+  const { kpis, vehicles, drivers, trips, expenses, fuelLogs } = useContext(AppContext);
   const [filterType, setFilterType] = useState('All');
   const [filterRegion, setFilterRegion] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  // Calculate safety, health and fuel averages
+  const avgSafety = drivers.length > 0 ? (drivers.reduce((sum, d) => sum + (d.safetyScore || 100), 0) / drivers.length).toFixed(1) : 100;
+  const avgHealth = vehicles.length > 0 ? (vehicles.reduce((sum, v) => sum + (v.healthScore || 100), 0) / vehicles.length).toFixed(1) : 100;
+
+  const totalFuelCost = vehicles.reduce((sum, v) => sum + (v.totalFuelCost || 0), 0);
+  const totalDistance = vehicles.reduce((sum, v) => sum + (v.totalDistanceTravelled || 0), 0);
+  const totalFuelConsumed = vehicles.reduce((sum, v) => sum + (v.totalFuelConsumed || 0), 0);
+  const avgEfficiency = totalFuelConsumed > 0 ? (totalDistance / totalFuelConsumed).toFixed(1) : 0;
 
   // Filter vehicles
   const filteredVehicles = vehicles.filter(v => {
     if (filterType !== 'All' && v.type !== filterType) return false;
     if (filterRegion !== 'All' && v.region !== filterRegion) return false;
+    if (filterStatus !== 'All' && v.status !== filterStatus) return false;
     return true;
   });
 
@@ -110,6 +123,21 @@ export default function Dashboard() {
                 {regions.map(r => <option key={r} value={r}>{r}</option>)}
               </select>
             </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ fontSize: '13px', fontWeight: '500', color: 'var(--text-secondary)' }}>Status:</span>
+              <select 
+                className="form-input" 
+                style={{ width: '130px', padding: '6px 12px' }}
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+              >
+                <option value="All">All</option>
+                <option value="Available">Available</option>
+                <option value="On Trip">On Trip</option>
+                <option value="In Shop">In Shop</option>
+                <option value="Retired">Retired</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -162,16 +190,16 @@ export default function Dashboard() {
       </div>
 
       {/* Additional Stats Section */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '24px', marginBottom: '32px' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '24px', marginBottom: '32px' }}>
         <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
           <div style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', color: 'var(--primary)' }}>
             <Map size={24} />
           </div>
           <div>
-            <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '500' }}>Active Dispatches</h4>
-            <h2 style={{ fontSize: '28px', fontWeight: '700' }}>{kpis ? kpis.activeTrips : 0}</h2>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Active Dispatches</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{kpis ? kpis.activeTrips : 0}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Pending Drafts: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{kpis ? kpis.pendingTrips : 0}</span>
+              Drafts: <span style={{ color: 'var(--text-primary)', fontWeight: '600' }}>{kpis ? kpis.pendingTrips : 0}</span>
             </p>
           </div>
         </div>
@@ -181,10 +209,62 @@ export default function Dashboard() {
             <Users size={24} />
           </div>
           <div>
-            <h4 style={{ fontSize: '14px', color: 'var(--text-secondary)', fontWeight: '500' }}>Drivers On Duty</h4>
-            <h2 style={{ fontSize: '28px', fontWeight: '700' }}>{kpis ? kpis.driversOnDuty : 0}</h2>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Drivers On Duty</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{kpis ? kpis.driversOnDuty : 0}</h2>
             <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              Assigned to active routes and ready to accept dispatches
+              Active profiles
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', color: 'var(--primary)' }}>
+            <Shield size={24} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Safety Rating</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{avgSafety}</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Safe Drivers Avg
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ backgroundColor: 'var(--warning-light)', padding: '12px', borderRadius: 'var(--radius-sm)', color: 'var(--warning)' }}>
+            <Activity size={24} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Vehicle Health</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{avgHealth}%</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Fleet Health Index
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ backgroundColor: 'var(--primary-light)', padding: '12px', borderRadius: 'var(--radius-sm)', color: 'var(--primary)' }}>
+            <Fuel size={24} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Fuel Efficiency</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>{avgEfficiency} km/L</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Fleet Avg Mileage
+            </p>
+          </div>
+        </div>
+
+        <div className="glass-card" style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
+          <div style={{ backgroundColor: 'var(--accent-light)', padding: '12px', borderRadius: 'var(--radius-sm)', color: 'var(--accent)' }}>
+            <TrendingUp size={24} />
+          </div>
+          <div>
+            <h4 style={{ fontSize: '12px', color: 'var(--text-secondary)', fontWeight: '500' }}>Fleet Fuel Cost</h4>
+            <h2 style={{ fontSize: '24px', fontWeight: '700' }}>₹{totalFuelCost?.toLocaleString('en-IN')}</h2>
+            <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '2px' }}>
+              Cumulative Refuel Costs
             </p>
           </div>
         </div>

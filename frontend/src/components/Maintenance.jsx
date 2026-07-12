@@ -1,12 +1,13 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../App';
-import { Plus, CheckSquare, Wrench } from 'lucide-react';
+import { Plus, CheckSquare, Wrench, Search } from 'lucide-react';
 
 export default function Maintenance() {
   const { user, token, maintenance, vehicles, loadData, triggerAlert } = useContext(AppContext);
   const [modalOpen, setModalOpen] = useState(false);
   const [closeModalOpen, setCloseModalOpen] = useState(false);
   const [selectedRecord, setSelectedRecord] = useState(null);
+  const [search, setSearch] = useState('');
 
   // Form Fields
   const [vehicleId, setVehicleId] = useState('');
@@ -86,10 +87,30 @@ export default function Maintenance() {
     }
   };
 
+  // Filtered maintenance records
+  const filteredList = maintenance.filter(m => 
+    m.description.toLowerCase().includes(search.toLowerCase()) ||
+    m.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    m.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    m.status.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div>
-      <div className="flex-between" style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '18px' }}>Maintenance Logs & Records</h3>
+      <div className="flex-between" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexGrow: 1, maxWidth: '400px' }}>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-secondary)' }} />
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ paddingLeft: '40px' }}
+              placeholder="Search logs by vehicle or description..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         {isSafety && (
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
             <Plus size={16} />
@@ -113,7 +134,7 @@ export default function Maintenance() {
             </tr>
           </thead>
           <tbody>
-            {maintenance.map(record => (
+            {filteredList.map(record => (
               <tr key={record._id}>
                 <td>
                   <span className={`badge badge-${record.status === 'Active' ? 'inshop' : 'available'}`}>

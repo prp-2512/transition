@@ -13,7 +13,10 @@ import {
   AlertCircle,
   CheckCircle2,
   Lock,
-  X
+  X,
+  Shield,
+  Calendar,
+  Fuel
 } from 'lucide-react';
 import LandingPage from './components/LandingPage';
 import Dashboard from './components/Dashboard';
@@ -23,6 +26,9 @@ import Trips from './components/Trips';
 import Maintenance from './components/Maintenance';
 import Expenses from './components/Expenses';
 import Reports from './components/Reports';
+import SafetyPortal from './components/SafetyPortal';
+import MaintenancePlanner from './components/MaintenancePlanner';
+import FuelPortal from './components/FuelPortal';
 
 export const AppContext = createContext();
 
@@ -197,6 +203,12 @@ export default function App() {
         return <Trips />;
       case 'maintenance':
         return <Maintenance />;
+      case 'service-schedules':
+        return <MaintenancePlanner />;
+      case 'safety':
+        return <SafetyPortal />;
+      case 'fuel':
+        return <FuelPortal />;
       case 'expenses':
         return <Expenses />;
       case 'reports':
@@ -385,7 +397,34 @@ export default function App() {
                   onClick={() => setCurrentPage('maintenance')}
                 >
                   <Wrench size={18} />
-                  <span>Maintenance</span>
+                  <span>Maintenance Logs</span>
+                </div>
+              </li>
+              <li>
+                <div 
+                  className={`nav-item ${currentPage === 'service-schedules' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('service-schedules')}
+                >
+                  <Calendar size={18} />
+                  <span>Service Schedules</span>
+                </div>
+              </li>
+              <li>
+                <div 
+                  className={`nav-item ${currentPage === 'safety' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('safety')}
+                >
+                  <Shield size={18} />
+                  <span>Safety Portal</span>
+                </div>
+              </li>
+              <li>
+                <div 
+                  className={`nav-item ${currentPage === 'fuel' ? 'active' : ''}`}
+                  onClick={() => setCurrentPage('fuel')}
+                >
+                  <Fuel size={18} />
+                  <span>Fuel Intelligence</span>
                 </div>
               </li>
               <li>

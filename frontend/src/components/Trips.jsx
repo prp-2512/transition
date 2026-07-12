@@ -1,12 +1,13 @@
 import React, { useContext, useState } from 'react';
 import { AppContext } from '../App';
-import { Plus, Check, Play, XCircle, ChevronRight, AlertCircle } from 'lucide-react';
+import { Plus, Check, Play, XCircle, ChevronRight, AlertCircle, Search } from 'lucide-react';
 
 export default function Trips() {
   const { user, token, trips, vehicles, drivers, loadData, triggerAlert } = useContext(AppContext);
   const [modalOpen, setModalOpen] = useState(false);
   const [completeModalOpen, setCompleteModalOpen] = useState(false);
   const [selectedTrip, setSelectedTrip] = useState(null);
+  const [search, setSearch] = useState('');
 
   // Complete Trip inputs
   const [finalOdometer, setFinalOdometer] = useState('');
@@ -162,10 +163,32 @@ export default function Trips() {
     }
   };
 
+  // Filtered trips
+  const filteredTrips = trips.filter(t => 
+    t.source.toLowerCase().includes(search.toLowerCase()) ||
+    t.destination.toLowerCase().includes(search.toLowerCase()) ||
+    t.vehicle?.registrationNumber?.toLowerCase().includes(search.toLowerCase()) ||
+    t.vehicle?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.driver?.name?.toLowerCase().includes(search.toLowerCase()) ||
+    t.status.toLowerCase().includes(search.toLowerCase())
+  );
+
   return (
     <div>
-      <div className="flex-between" style={{ marginBottom: '24px' }}>
-        <h3 style={{ fontSize: '18px' }}>Active Logistics Routes</h3>
+      <div className="flex-between" style={{ marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexGrow: 1, maxWidth: '400px' }}>
+          <div style={{ position: 'relative', width: '100%' }}>
+            <Search size={18} style={{ position: 'absolute', left: '12px', top: '11px', color: 'var(--text-secondary)' }} />
+            <input 
+              type="text" 
+              className="form-input" 
+              style={{ paddingLeft: '40px' }}
+              placeholder="Search trips by route, vehicle or driver..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+            />
+          </div>
+        </div>
         {isDriverOrManager && (
           <button className="btn btn-primary" onClick={() => setModalOpen(true)}>
             <Plus size={16} />
@@ -190,7 +213,7 @@ export default function Trips() {
             </tr>
           </thead>
           <tbody>
-            {trips.map(trip => (
+            {filteredTrips.map(trip => (
               <tr key={trip._id}>
                 <td>
                   <span className={`badge badge-${trip.status.toLowerCase()}`}>
