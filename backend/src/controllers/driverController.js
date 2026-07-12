@@ -8,6 +8,8 @@ const getDrivers = async (req, res, next) => {
     const { status, licenseCategory, search, sort } = req.query;
     let query = {};
 
+    //we have created an empty query, and after that it is concatenated as per the filtering param
+
     // Filter by status, license category
     if (status) query.status = status;
     if (licenseCategory) query.licenseCategory = licenseCategory;
