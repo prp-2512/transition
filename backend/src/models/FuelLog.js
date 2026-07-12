@@ -8,6 +8,16 @@ const fuelLogSchema = new mongoose.Schema(
       required: [true, 'Please associate a vehicle'],
       index: true,
     },
+    trip: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Trip',
+      index: true,
+    },
+    driver: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Driver',
+      index: true,
+    },
     liters: {
       type: Number,
       required: [true, 'Please add liters of fuel'],
@@ -15,6 +25,25 @@ const fuelLogSchema = new mongoose.Schema(
     cost: {
       type: Number,
       required: [true, 'Please add fuel cost'],
+    },
+    pricePerLiter: {
+      type: Number,
+    },
+    odometer: {
+      type: Number,
+    },
+    fuelType: {
+      type: String,
+      default: 'Diesel',
+    },
+    fuelStation: {
+      type: String,
+      trim: true,
+      default: 'Indian Oil Petrol Pump',
+    },
+    remarks: {
+      type: String,
+      trim: true,
     },
     date: {
       type: Date,

@@ -25,6 +25,9 @@ const tripRoutes = require('./routes/tripRoutes');
 const maintenanceRoutes = require('./routes/maintenanceRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const safetyRoutes = require('./routes/safetyRoutes');
+const maintenanceScheduleRoutes = require('./routes/maintenanceScheduleRoutes');
+const fuelRoutes = require('./routes/fuelRoutes');
 
 // Connect to database
 connectDB();
@@ -83,6 +86,9 @@ app.use('/api/trips', tripRoutes);
 app.use('/api/maintenance', maintenanceRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/safety', safetyRoutes);
+app.use('/api/maintenance-schedules', maintenanceScheduleRoutes);
+app.use('/api/fuel', fuelRoutes);
 
 // Fallback to React frontend
 app.get('*', (req, res, next) => {

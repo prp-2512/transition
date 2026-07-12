@@ -2,6 +2,11 @@ const Trip = require('../models/Trip');
 const Vehicle = require('../models/Vehicle');
 const Driver = require('../models/Driver');
 const FuelLog = require('../models/FuelLog');
+const SafetyIncident = require('../models/SafetyIncident');
+const MaintenanceSchedule = require('../models/MaintenanceSchedule');
+const { recalculateDriverSafetyScore } = require('./safetyController');
+const { recalculateVehicleHealthScore } = require('./maintenanceScheduleController');
+const { recalculateVehicleFuelStats } = require('./fuelController');
 
 // Helper to run validations on vehicle and driver
 const validateTripAssignment = (vehicle, driver, cargoWeight) => {
@@ -11,6 +16,9 @@ const validateTripAssignment = (vehicle, driver, cargoWeight) => {
   }
   if (vehicle.status === 'On Trip') {
     throw new Error('Vehicle is already assigned to an active trip');
+  }
+  if (vehicle.maintenanceDue) {
+    throw new Error('Vehicle has pending maintenance due and cannot be dispatched');
   }
 
   // 2. Cargo weight check
@@ -27,6 +35,9 @@ const validateTripAssignment = (vehicle, driver, cargoWeight) => {
   }
   if (driver.status === 'Off Duty') {
     throw new Error('Driver is off-duty and cannot be assigned to trips');
+  }
+  if (!driver.driverEligible || driver.safetyScore < 50) {
+    throw new Error(`Driver has critical safety score (${driver.safetyScore}) or status, ineligible for trips`);
   }
 
   // 4. Expiry license check
@@ -102,7 +113,22 @@ const createTrip = async (req, res, next) => {
     }
 
     // Run business validation checks
-    validateTripAssignment(vehicle, driver, cargoWeight);
+    try {
+      validateTripAssignment(vehicle, driver, cargoWeight);
+    } catch (err) {
+      if (cargoWeight > vehicle.maxLoadCapacity) {
+        await SafetyIncident.create({
+          driver: driverId,
+          vehicle: vehicleId,
+          type: 'Overload Attempt',
+          reason: `Attempted payload of ${cargoWeight} kg exceeds vehicle capacity ${vehicle.maxLoadCapacity} kg.`,
+          scoreImpact: 5,
+        });
+        await recalculateDriverSafetyScore(driverId, 'Overload Attempt', 'Payload Limit Breach Attempt', null, vehicleId);
+      }
+      res.status(400);
+      throw err;
+    }
 
     const trip = await Trip.create({
       source,
@@ -141,7 +167,22 @@ const dispatchTrip = async (req, res, next) => {
     const driver = await Driver.findById(trip.driver);
 
     // Validate rules again before dispatching
-    validateTripAssignment(vehicle, driver, trip.cargoWeight);
+    try {
+      validateTripAssignment(vehicle, driver, trip.cargoWeight);
+    } catch (err) {
+      if (trip.cargoWeight > vehicle.maxLoadCapacity) {
+        await SafetyIncident.create({
+          driver: trip.driver,
+          vehicle: trip.vehicle,
+          type: 'Overload Attempt',
+          reason: `Attempted payload of ${trip.cargoWeight} kg exceeds vehicle capacity ${vehicle.maxLoadCapacity} kg on dispatch.`,
+          scoreImpact: 5,
+        });
+        await recalculateDriverSafetyScore(trip.driver, 'Overload Attempt', 'Payload Limit Breach Attempt on Dispatch', null, trip.vehicle);
+      }
+      res.status(400);
+      throw err;
+    }
 
     // Update statuses
     vehicle.status = 'On Trip';
@@ -197,21 +238,65 @@ const completeTrip = async (req, res, next) => {
     driver.status = 'Available';
     await driver.save();
 
-    // 2. Complete trip details
+    // 2. Evaluate vehicle maintenance schedules
+    const schedules = await MaintenanceSchedule.find({ vehicle: vehicle._id, status: { $ne: 'Completed' } }).populate('maintenanceType');
+    for (const sch of schedules) {
+      if (sch.maintenanceType) {
+        const remKM = sch.nextServiceOdometer - vehicle.odometer;
+        const remDays = Math.ceil((new Date(sch.nextServiceDate) - new Date()) / (1000 * 60 * 60 * 24));
+        
+        if (remKM <= 0 || remDays <= 0) {
+          sch.status = 'Overdue';
+        } else if (remKM <= 500 || remDays <= 10) {
+          sch.status = 'Due Soon';
+        } else {
+          sch.status = 'Healthy';
+        }
+        await sch.save();
+      }
+    }
+    await recalculateVehicleHealthScore(vehicle._id);
+
+    // 3. Complete trip details
     trip.status = 'Completed';
     trip.actualOdometerEnd = actualOdometerEnd;
     trip.fuelConsumed = fuelConsumed;
     trip.completedAt = new Date();
     await trip.save();
 
+    // 4. Log late trip safety incident if flag is set or duration exceeds 8 hours
+    const isLate = req.body.isLate || (new Date() - new Date(trip.dispatchedAt)) > 8 * 60 * 60 * 1000;
+    if (isLate) {
+      await SafetyIncident.create({
+        driver: driver._id,
+        trip: trip._id,
+        vehicle: vehicle._id,
+        type: 'Late Completion',
+        reason: `Trip completed late. Odometer start: ${trip.actualOdometerStart}, Odometer end: ${actualOdometerEnd}.`,
+        scoreImpact: 5,
+      });
+    }
+
+    // 5. Recalculate driver safety score
+    await recalculateDriverSafetyScore(driver._id, 'Trip Completed Evaluation', 'Trip Completion Odometer Scan', trip._id, vehicle._id);
+
     // 3. Log fuel expense if fuel was consumed
     if (fuelConsumed && fuelConsumed > 0) {
+      const fCost = fuelCost || (fuelConsumed * 98); // Fallback: ₹98 per liter
       await FuelLog.create({
         vehicle: vehicle._id,
+        trip: trip._id,
+        driver: driver._id,
         liters: fuelConsumed,
-        cost: fuelCost || (fuelConsumed * 1.5), // Fallback: $1.50 per liter
+        cost: fCost,
+        pricePerLiter: fCost / fuelConsumed,
+        odometer: actualOdometerEnd,
+        fuelType: 'Diesel',
+        fuelStation: 'Route Refill Station',
         date: new Date(),
       });
+      // Recalculate vehicle fuel statistics
+      await recalculateVehicleFuelStats(vehicle._id, req.user?._id, `Trip completed: ${trip.source} to ${trip.destination}`);
     }
 
     const completedTrip = await Trip.findById(trip._id).populate('vehicle').populate('driver');
@@ -256,6 +341,19 @@ const cancelTrip = async (req, res, next) => {
     trip.status = 'Cancelled';
     trip.cancelledAt = new Date();
     await trip.save();
+
+    // Log trip cancellation incident (deduct 2 points)
+    if (driver) {
+      await SafetyIncident.create({
+        driver: driver._id,
+        trip: trip._id,
+        vehicle: vehicle ? vehicle._id : null,
+        type: 'Cancelled Trip',
+        reason: 'Trip cancelled by operator or driver.',
+        scoreImpact: 2,
+      });
+      await recalculateDriverSafetyScore(driver._id, 'Trip Cancelled', 'Trip Cancellation Logging', trip._id, vehicle ? vehicle._id : null);
+    }
 
     const cancelledTrip = await Trip.findById(trip._id).populate('vehicle').populate('driver');
 

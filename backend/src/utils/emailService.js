@@ -1,15 +1,25 @@
 const nodemailer = require('nodemailer');
 
 const sendEmail = async (options) => {
-  // Create transporter
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.mailtrap.io',
-    port: process.env.SMTP_PORT || 2525,
-    auth: {
+  // Create transporter configuration
+  const transporterOpts = {};
+  
+  if (process.env.SMTP_SERVICE === 'gmail' || (process.env.SMTP_USER && process.env.SMTP_USER.includes('gmail.com'))) {
+    transporterOpts.service = 'gmail';
+    transporterOpts.auth = {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    };
+  } else {
+    transporterOpts.host = process.env.SMTP_HOST || 'smtp.mailtrap.io';
+    transporterOpts.port = process.env.SMTP_PORT || 2525;
+    transporterOpts.auth = {
       user: process.env.SMTP_USER || 'mock',
       pass: process.env.SMTP_PASS || 'mock',
-    },
-  });
+    };
+  }
+
+  const transporter = nodemailer.createTransport(transporterOpts);
 
   const message = {
     from: `"TransitOps Fleet Alert" <no-reply@transitops.com>`,

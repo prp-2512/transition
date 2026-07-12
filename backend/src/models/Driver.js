@@ -43,6 +43,45 @@ const driverSchema = new mongoose.Schema(
       index: true,
       default: 'Available',
     },
+    safetyGrade: {
+      type: String,
+      enum: ['A', 'B', 'C', 'D', 'F'],
+      default: 'A',
+    },
+    riskLevel: {
+      type: String,
+      enum: ['Low', 'Medium', 'High', 'Critical'],
+      default: 'Low',
+    },
+    lastScoreUpdate: Date,
+    violationCount: {
+      type: Number,
+      default: 0,
+    },
+    accidentCount: {
+      type: Number,
+      default: 0,
+    },
+    lateTripCount: {
+      type: Number,
+      default: 0,
+    },
+    cancelledTripCount: {
+      type: Number,
+      default: 0,
+    },
+    overloadedTripCount: {
+      type: Number,
+      default: 0,
+    },
+    customerComplaintCount: {
+      type: Number,
+      default: 0,
+    },
+    driverEligible: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,

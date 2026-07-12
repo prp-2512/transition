@@ -56,6 +56,70 @@ const vehicleSchema = new mongoose.Schema(
         },
       },
     ],
+    lastMaintenanceDate: Date,
+    lastMaintenanceOdometer: Number,
+    nextMaintenanceDate: Date,
+    nextMaintenanceOdometer: Number,
+    maintenanceDue: {
+      type: Boolean,
+      default: false,
+    },
+    maintenanceState: {
+      type: String,
+      enum: ['Healthy', 'Due Soon', 'Due', 'Overdue', 'In Progress', 'Completed'],
+      default: 'Healthy',
+      index: true,
+    },
+    maintenancePriority: {
+      type: String,
+      enum: ['Low', 'Medium', 'High', 'Critical'],
+      default: 'Low',
+    },
+    totalMaintenanceCost: {
+      type: Number,
+      default: 0,
+    },
+    totalNumberOfServices: {
+      type: Number,
+      default: 0,
+    },
+    lastServiceType: String,
+    healthScore: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 100,
+    },
+    averageFuelEfficiency: {
+      type: Number,
+      default: 0,
+    },
+    totalFuelConsumed: {
+      type: Number,
+      default: 0,
+    },
+    totalFuelCost: {
+      type: Number,
+      default: 0,
+    },
+    totalDistanceTravelled: {
+      type: Number,
+      default: 0,
+    },
+    fuelCostPerKM: {
+      type: Number,
+      default: 0,
+    },
+    fuelEfficiencyRating: {
+      type: String,
+      enum: ['Excellent', 'Good', 'Average', 'Poor', 'Critical'],
+      default: 'Average',
+    },
+    lastFuelEntryDate: Date,
+    lastFuelCost: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

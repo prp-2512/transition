@@ -7,6 +7,13 @@ const Trip = require('../models/Trip');
 const Maintenance = require('../models/Maintenance');
 const Expense = require('../models/Expense');
 const FuelLog = require('../models/FuelLog');
+const MaintenanceType = require('../models/MaintenanceType');
+const MaintenanceSchedule = require('../models/MaintenanceSchedule');
+const SafetyIncident = require('../models/SafetyIncident');
+const SafetyAuditLog = require('../models/SafetyAuditLog');
+const { recalculateDriverSafetyScore } = require('../controllers/safetyController');
+const { recalculateVehicleHealthScore } = require('../controllers/maintenanceScheduleController');
+const { recalculateVehicleFuelStats } = require('../controllers/fuelController');
 
 require('dotenv').config();
 
@@ -24,6 +31,10 @@ const seedData = async () => {
     await Maintenance.deleteMany();
     await Expense.deleteMany();
     await FuelLog.deleteMany();
+    await MaintenanceType.deleteMany();
+    await MaintenanceSchedule.deleteMany();
+    await SafetyIncident.deleteMany();
+    await SafetyAuditLog.deleteMany();
     console.log('Cleared existing collections.');
 
     // 1. Seed Users (Roles are uniform globally, emails remain simple)
@@ -95,7 +106,7 @@ const seedData = async () => {
         region: 'Delhi NCR',
       },
       {
-        registrationNumber: 'GJ-01-LM-05',
+        registrationNumber: 'GJ-01-LM-0504',
         name: 'BharatBenz 2823R',
         type: 'Heavy Truck',
         maxLoadCapacity: 28000,
@@ -185,9 +196,153 @@ const seedData = async () => {
     
     const dRajesh = seededDrivers.find(d => d.name === 'Rajesh Gond');
     const dAmit = seededDrivers.find(d => d.name === 'Amit Sharma');
+    const dSuresh = seededDrivers.find(d => d.name === 'Suresh Das');
+    const dVijay = seededDrivers.find(d => d.name === 'Vijay Patel');
 
-    // 4. Seed Maintenance Logs (INR values)
-    const activeMaint = await Maintenance.create({
+    // 4. Seed Maintenance Types
+    const maintenanceTypes = [
+      {
+        name: 'Oil Change',
+        description: 'Engine oil flush & replacement filter check',
+        category: 'Preventive',
+        intervalKM: 5000,
+        intervalMonths: 6,
+        estimatedDuration: 2,
+        estimatedCost: 3500,
+        priority: 'Medium',
+      },
+      {
+        name: 'Brake Inspection',
+        description: 'Brake pad and rotor thickness inspection',
+        category: 'Preventive',
+        intervalKM: 15000,
+        intervalMonths: 12,
+        estimatedDuration: 4,
+        estimatedCost: 5000,
+        priority: 'High',
+      },
+      {
+        name: 'Tyre Rotation',
+        description: 'Align and balance wheels, rotate positions',
+        category: 'Preventive',
+        intervalKM: 10000,
+        intervalMonths: 6,
+        estimatedDuration: 1.5,
+        estimatedCost: 2000,
+        priority: 'Low',
+      },
+      {
+        name: 'Engine Service',
+        description: 'Comprehensive tune up and electronic diagnostics',
+        category: 'Preventive',
+        intervalKM: 20000,
+        intervalMonths: 12,
+        estimatedDuration: 8,
+        estimatedCost: 15000,
+        priority: 'Critical',
+      },
+      {
+        name: 'Coolant Replacement',
+        description: 'Radiator flush and anti-freeze replacement',
+        category: 'Preventive',
+        intervalKM: 20000,
+        intervalMonths: 24,
+        estimatedDuration: 1,
+        estimatedCost: 1800,
+        priority: 'Medium',
+      },
+    ];
+
+    const seededTypes = await MaintenanceType.insertMany(maintenanceTypes);
+    console.log(`Seeded ${seededTypes.length} Maintenance Types.`);
+
+    const tOil = seededTypes.find(t => t.name === 'Oil Change');
+    const tBrake = seededTypes.find(t => t.name === 'Brake Inspection');
+    const tTyre = seededTypes.find(t => t.name === 'Tyre Rotation');
+
+    // 5. Seed Maintenance Schedules
+    const schedules = [
+      {
+        vehicle: vTata._id,
+        maintenanceType: tOil._id,
+        lastServiceDate: futureDate(-15),
+        lastServiceOdometer: 14000,
+        technician: 'Tata Authorized Workshop',
+        notes: 'Pre-seeded initial service',
+        status: 'Healthy',
+      },
+      {
+        vehicle: vAshok._id,
+        maintenanceType: tTyre._id,
+        lastServiceDate: futureDate(-170), // Expiring soon in days
+        lastServiceOdometer: 27950, // 28400 - 27950 = 450 km remaining (Due soon)
+        technician: 'Local Garage Service',
+        notes: 'Alignment check needed',
+        status: 'Due Soon',
+      },
+      {
+        vehicle: vMahindra._id,
+        maintenanceType: tBrake._id,
+        lastServiceDate: futureDate(-400), // Overdue in days
+        lastServiceOdometer: 70000, // 89450 - 70000 = 19450 km driven (limit was 15000 km, so Overdue)
+        technician: 'Mahindra Service Hub',
+        notes: 'Clutch pad squeal reported',
+        status: 'Overdue',
+      },
+    ];
+
+    for (const sch of schedules) {
+      const scheduleObj = new MaintenanceSchedule(sch);
+      await scheduleObj.save();
+    }
+    console.log('Seeded Maintenance Schedules.');
+
+    // 6. Seed Safety Incidents
+    const incidents = [
+      {
+        driver: dSuresh._id,
+        type: 'Accident',
+        reason: 'Collision on National Highway 8. Minor front bumper damage.',
+        scoreImpact: 30,
+        vehicle: vMahindra._id,
+        date: futureDate(-20),
+      },
+      {
+        driver: dSuresh._id,
+        type: 'Violation',
+        reason: 'Overspeeding ticket near Surat toll bypass.',
+        scoreImpact: 15,
+        vehicle: vMahindra._id,
+        date: futureDate(-15),
+      },
+      {
+        driver: dSuresh._id,
+        type: 'Cancelled Trip',
+        reason: 'Cancelled active dispatch trip without prior notice.',
+        scoreImpact: 2,
+        date: futureDate(-5),
+      },
+      {
+        driver: dVijay._id,
+        type: 'Customer Complaint',
+        reason: 'Rude behaviour reported by warehouse receipt staff.',
+        scoreImpact: 10,
+        date: futureDate(-2),
+      },
+      {
+        driver: dAmit._id,
+        type: 'Violation',
+        reason: 'Red light traffic violation caught on signal cam.',
+        scoreImpact: 15,
+        date: futureDate(-30),
+      },
+    ];
+
+    await SafetyIncident.insertMany(incidents);
+    console.log('Seeded Safety Incidents.');
+
+    // 7. Seed Maintenance Logs (INR values)
+    await Maintenance.create({
       vehicle: vMahindra._id,
       description: 'Fuel injector cleaning & clutch pad replacement',
       cost: 18500, // ₹18,500
@@ -195,7 +350,7 @@ const seedData = async () => {
       startDate: futureDate(-2),
     });
 
-    const closedMaint = await Maintenance.create({
+    await Maintenance.create({
       vehicle: vTata._id,
       description: 'Engine oil flush & brake liner rotation',
       cost: 24000, // ₹24,000
@@ -214,7 +369,7 @@ const seedData = async () => {
 
     console.log('Seeded Maintenance Records and generated maintenance expense logs.');
 
-    // 5. Seed Fuel Logs (INR values: ~₹98 per liter)
+    // 8. Seed Fuel Logs (INR values: ~₹98 per liter)
     const fuelLogs = [
       {
         vehicle: vTata._id,
@@ -238,7 +393,7 @@ const seedData = async () => {
     await FuelLog.insertMany(fuelLogs);
     console.log('Seeded Fuel logs.');
 
-    // 6. Seed Expenses (INR values)
+    // 9. Seed Expenses (INR values)
     const miscExpenses = [
       {
         vehicle: vTata._id,
@@ -258,9 +413,9 @@ const seedData = async () => {
     await Expense.insertMany(miscExpenses);
     console.log('Seeded miscellaneous expenses.');
 
-    // 7. Seed Trips (INR values)
+    // 10. Seed Trips (INR values)
     // Completed trip
-    await Trip.create({
+    const t1 = await Trip.create({
       source: 'Mumbai, MH',
       destination: 'Pune, MH',
       vehicle: vTata._id,
@@ -287,7 +442,7 @@ const seedData = async () => {
     });
 
     // Completed trip 2
-    await Trip.create({
+    const t2 = await Trip.create({
       source: 'Bengaluru, KA',
       destination: 'Chennai, TN',
       vehicle: vAshok._id,
@@ -326,6 +481,20 @@ const seedData = async () => {
     });
 
     console.log('Seeded completed and draft Trips.');
+
+    // 11. Run initial calculations to sync everything
+    console.log('Running initial safety & maintenance schedule synchronizations...');
+    const dbDrivers = await Driver.find({});
+    for (const d of dbDrivers) {
+      await recalculateDriverSafetyScore(d._id, 'Initial Seeding Sync', 'Initial Recalculation');
+    }
+
+    const dbVehicles = await Vehicle.find({});
+    for (const v of dbVehicles) {
+      await recalculateVehicleHealthScore(v._id);
+      await recalculateVehicleFuelStats(v._id, null, 'Initial Seeding Sync');
+    }
+
     console.log('Database Seeding Completed Successfully.');
     process.exit(0);
   } catch (error) {
